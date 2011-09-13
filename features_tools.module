@@ -5,6 +5,15 @@
  */
 
 /**
+ * Implementation of hook_perm().
+ *
+ * @return array An array of valid permissions for the features_tools module
+ */
+function features_tools_perm() {
+  return array('execute unlink files');
+}
+
+/**
  * Implementation of hook_menu().
  *
  * @return An array of menu items.
@@ -12,22 +21,16 @@
 function features_tools_menu() {
   $items = array();
 
-  $items['unlink'] = array(
-    'title' => 'unlink test',
+  $items['admin/build/features/unlink'] = array(
+    'title' => 'Execute unlink files',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('features_tools_unlink_form'),
-    'access arguments' => array('access administration pages'),
+    'access arguments' => array('execute unlink files'),
   );
 
   return $items;
 }
-/**
- * Implementation of hook_init().
- */
-function features_tools_init() {
-  //  $files = drupal_system_listing('\.unlink.inc$', 'modules', 'name', 0);
-//dpm($view);  
-}
+
 /**
  * Implementation of hook_form_FORM_ID_alter().
  */
@@ -57,75 +60,90 @@ function features_tools_form_features_export_form_alter(&$form, &$form_state) {
 }
 
 function features_tools_form_features_export_form_safe_submit($form, &$form_state) {
-//  dpm($form);dpm($form_state);
+  
   module_load_include('inc', 'features', 'features.export');
   features_include();
-  if ($form_state['clicked_button']['#id'] == 'edit-safe-recreate') {
-    $destination = $form_state['values']['features_tools_dest'];
-    $arr = explode('/', $destination); 
-    $arr[sizeof($arr) - 1].= '_unlink';
-    $module_name = $arr[sizeof($arr) - 1];
-    $destination = implode('/', $arr) . '/';
-    $hooks = _features_tools_get_hooks();
-    $new_feature = $form_state['values']['sources'];
-    $old_feature = $form['#feature']->info['features'];
-    $stub = array();
-    foreach ($hooks as $hook) {
-      if (isset($old_feature[$hook])) {
-        foreach ($old_feature[$hook] as $value) {
-          if (!$new_feature[$hook][$value]) {
-            $stub[$hook][] = $value;  
-          }
-        }      
-      }
-    }
-    if ($stub) {
-      $code_buffer = '';
-      $file_content = array();
-      foreach ($stub as $hook => $value) {
-        $output = array();
-        foreach ($value as $component) {
-          switch ($hook) {
-            case 'views':
-              $view = views_get_view($component);
-              $output[] = $view->export();
-              $output[] = '$view->save();';
-              break;
-            case 'box':
-              $export = array('features' => array('box' => array($component => $component)));
-              $component_hooks = features_export_render_hooks($export, $module_name, TRUE);
-              $output[] = str_replace(' return $export;', '', $component_hooks['box']['default_box']);
-              $output[] = 'drupal_write_record(' . "'box'" . ', $box);';
-              break;
-          }
-        }    
-        $code_buffer .= implode("\n", $output);
-        $output = array();
-        $output[] = "/**";
-        $output[] = " * Unlink {$module_name}_unlink_{$hook}().";
-        $output[] = " */";
-        $output[] = "function {$module_name}_unlink_{$hook}() {";
-        $output[] = $code_buffer;
-        $output[] = "}";
-        $file_content[0] .= implode("\n", $output);      
-      }
-      $file_content = "<?php\n\n". implode("\n\n", $file_content) ."\n";
-      if (!file_exists($destination)) {
-        mkdir($destination, 0777, TRUE);
-      }
-      $error = '';
-      if (file_put_contents("{$destination}/$module_name.unlink.inc", $file_content) === FALSE) {
-        $error = TRUE;
-      }
-      if ($error) {
-        drupal_set_message(t('One or more files cannot be writing to the file system this is probably a permission issue. @see http://drupal.org/project/features_tools for more info'));
-      }
-      else {
-        features_tools_export_build_form_submit($form, $form_state);
-        drupal_set_message(t('The feature was safely and successfully created.'));
-      }
+  rules_include('rules_admin');
+  module_load_include('inc', 'rules_admin', 'rules_admin.export');
+  module_load_include('inc', 'rules', 'rules.export');  
+
+  $destination = $form_state['values']['features_tools_dest'];
+  $arr = explode('/', $destination); 
+  $arr[sizeof($arr) - 1].= '_unlink';
+  $module_name = $arr[sizeof($arr) - 1];
+  $destination = implode('/', $arr) . '/';
+  $destination_info = _features_tools_get_unlink_version($destination);
+  $hooks = _features_tools_get_hooks();
+  $new_feature = $form_state['values']['sources'];
+  $old_feature = $form['#feature']->info['features'];
+  $stub = array();
+  foreach ($hooks as $hook) {
+    if (isset($old_feature[$hook])) {
+      foreach ($old_feature[$hook] as $value) {
+        if (!$new_feature[$hook][$value]) {
+          $stub[$hook][] = $value;  
+        }
+      }      
     }
   }
+  if ($stub) {
+    
+    $file_content = array();
+    foreach ($stub as $hook => $value) {
+      $output = array();
+      $code_buffer = '';
+      foreach ($value as $component) {
+        switch ($hook) {
+          case 'views':
+            $view = views_get_view($component);
+            $output[] = $view->export();
+            $output[] = '$view->save();';
+            break;
+          case 'box':
+            $export = array('features' => array('box' => array($component => $component)));
+            $component_hooks = features_export_render_hooks($export, $module_name, TRUE);
+            $output[] = str_replace(' return $export;', '', $component_hooks['box']['default_box']);
+            $output[] = 'drupal_write_record(' . "'box'" . ', $box);';
+            break;
+          case 'rules_categories':
+            $export = array();
+            
+            $export = rules_categories_features_export_render($form['#feature']->name, array($component => $component));
+            $output[] = str_replace('return', '$rules = ', $export['rules_defaults']);
+            $output[] = '  foreach ($rules as $item_type => $elements) {';
+            $output[] = '    foreach ($elements as $name => $element) {';
+            $output[] = "      rules_item_type_invoke(" . '$item_type' . ", 'import', " . 'array(&$name, &$element));';
+            $output[] = '      rules_item_save($item_type, $name, $element);';
+            $output[] = "      drupal_set_message(t('Imported %label.', array('%label' => rules_get_element_label(" . '$element))));';
+            $output[] = "    }";
+            $output[] = "  }";
+        }
+      }    
+      $code_buffer .= implode("\n", $output);
+      $output = array();
+      $output[] = "/**";
+      $output[] = " * Unlink {$module_name}_{$destination_info['delta']}_{$hook}().";
+      $output[] = " */";
+      $output[] = "function {$module_name}_{$destination_info['delta']}_{$hook}() {";
+      $output[] = $code_buffer;
+      $output[] = "}";
+      $file_content[] = implode("\n", $output);
+    }
+    $file_content = "<?php\n\n". implode("\n\n", $file_content) ."\n";
+    mkdir($destination_info['destination'], 0777, TRUE);
+    $error = '';
+    if (file_put_contents("{$destination_info['destination']}$module_name.{$destination_info['delta']}.unlink.inc", $file_content) === FALSE) {
+      $error = TRUE;
+    }
+    if ($error) {
+      drupal_set_message(t('One or more files cannot be writing to the file system this is probably a permission issue. @see http://drupal.org/project/features_tools for more info'));
+      return;
+    }
+    else {
+      drupal_set_message(t('The unlink file was successfully created.'));
+    }
+  }
+  features_tools_export_build_form_submit($form, $form_state);
 }
 
 /**
@@ -230,7 +248,8 @@ function features_tools_unlink_form_submit($form, &$form_state) {
       views_include('view');
       //ft_unlink_unlink_views
       foreach ($hooks as $hook) {
-        $function_name = str_replace('.', '_', $key) . "_$hook";
+        $function_name = str_replace('.unlink', '', $key) . "_$hook";
+        $function_name = str_replace('.', '_', $function_name);
         if (function_exists($function_name)) {
           call_user_func_array($function_name, array());
           drupal_set_message("$hook $function_name");
@@ -241,5 +260,20 @@ function features_tools_unlink_form_submit($form, &$form_state) {
 }
 
 function _features_tools_get_hooks() {
-  return array('box', 'views');
+  return array('box', 'views', 'rules_categories');
+}
+
+
+/**
+ * Get the next version for the unlink directory.
+ * @param string $destination , the $destination path.
+ * @return array with the directory delta and the new destination.
+ */
+function _features_tools_get_unlink_version($destination) {
+  $destination = substr($destination, 0, strlen($destination) - 1);
+  $i = 1;
+  while (file_exists("{$destination}_$i")) {
+    $i++;
+  }
+  return array('destination' =>"{$destination}_$i/", 'delta' => $i); 
 }
