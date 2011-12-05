@@ -197,12 +197,6 @@ function features_tools_export_build_form_submit($form, &$form_state) {
     if (!file_exists($directory)) {
       mkdir($directory, 0777, TRUE);
     }
-    else {
-      //If the directory exists delete all the files before recreation, to clean the dead files in case some elements removed from the feature.
-      foreach (glob($directory . '*.*') as $v) {
-        unlink($v);
-      }
-    }
     $error = false;
     foreach ($files as $extension => $file_contents) {
       if (!in_array($extension, array('module', 'info'))) {
