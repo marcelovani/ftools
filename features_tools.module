@@ -5,6 +5,20 @@
  */
 
 /**
+ * Implements hook_js_alter().
+ */
+function features_tools_js_alter(&$javascript) {
+  $item = menu_get_item();
+  if (isset($item['path']) && $item['path'] === 'admin/structure/features') {
+    $js_path = drupal_get_path('module', 'features') . '/features.js';
+    if (isset($javascript[$js_path])) {
+      if (variable_get('featrues_tools_disable_features_page_js', 0)) {
+        unset($javascript[$js_path]);
+      }
+    }
+  }
+}
+/**
  * Implements hook_permission().
  *
  * @return array An array of valid permissions for the features_tools module
@@ -34,6 +48,57 @@ function features_tools_menu() {
   );
 
   return $items;
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function features_tools_form_features_admin_form_alter(&$form, &$form_state) {
+  if (!variable_get('featrues_tools_disable_features_page_js', 0)) {
+    return;
+  }
+  drupal_add_css('table.features .admin-check, table.features .admin-default, table.features .admin-overridden, table.features .admin-rebuilding, table.features .admin-needs-review {
+									display: inline!important;}', array('type' => 'inline'));
+  $groups = array();
+  foreach ($form['#features'] as $feature) {
+    if (isset($feature->info['package'])) {
+      $package_title = !empty($feature->info['package']) ? $feature->info['package'] : t('Other');
+      $package = strtolower(preg_replace('/[^a-zA-Z0-9-]+/', '-', $package_title));
+      if (in_array($package, $groups)) {
+        continue;
+      }
+      $groups[] = $package;
+    }
+  }
+  foreach ($groups as $group) {
+    foreach ($form[$group]['state'] as $feature_name => &$feature_status) {
+      if ($form[$group]['status'][$feature_name]['#default_value'] == 0) {
+        continue;
+      }
+      $status = features_get_storage($feature_name);
+      $cls = "admin";
+      switch ($status) {
+        case 3:
+          $cls .= "-rebuilding";
+          $txt = "Rebuilding";
+          break;
+        case 2:
+          $cls .= "-needs-review"; 
+          $txt = "Needs review";
+          break;
+        case 1:
+          $txt = "Overridden";
+          $cls .= "-overridden"; 
+          break;
+        default:
+          $txt = "Default";
+          $cls .= "-default"; 
+          break;
+      }
+      $cls .= " features-storage";
+      $feature_status['#markup'] = l($txt, "admin/structure/features/$feature_name", array('attributes' => array('class' => $cls)));
+    }
+  }  
 }
 
 /**
