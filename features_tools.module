@@ -63,10 +63,11 @@ function features_tools_form_features_export_form_safe_submit($form, &$form_stat
   
   module_load_include('inc', 'features', 'features.export');
   features_include();
-  rules_include('rules_admin');
-  module_load_include('inc', 'rules_admin', 'rules_admin.export');
-  module_load_include('inc', 'rules', 'rules.export');  
-
+  if (module_exists('rules')) {
+    rules_include('rules_admin');
+    module_load_include('inc', 'rules_admin', 'rules_admin.export');
+    module_load_include('inc', 'rules', 'rules.export');  
+  }
   $destination = $form_state['values']['features_tools_dest'];
   $arr = explode('/', $destination); 
   $arr[sizeof($arr) - 1].= '_unlink';
