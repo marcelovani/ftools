@@ -12,7 +12,7 @@ function features_tools_js_alter(&$javascript) {
   if (isset($item['path']) && $item['path'] === 'admin/structure/features') {
     $js_path = drupal_get_path('module', 'features') . '/features.js';
     if (isset($javascript[$js_path])) {
-      if (variable_get('featrues_tools_disable_features_page_js', 0)) {
+      if (variable_get('featrues_tools_disable_features_page_js', 1)) {
         unset($javascript[$js_path]);
       }
     }
@@ -54,12 +54,15 @@ function features_tools_menu() {
  * Implements hook_form_alter().
  */
 function features_tools_form_features_admin_form_alter(&$form, &$form_state) {
-  if (!variable_get('featrues_tools_disable_features_page_js', 0)) {
+  $form['disable_ajax'] = array('#type' => 'checkbox', '#title' => t('disable the features status ajax loading'), '#default_value' => variable_get('featrues_tools_disable_features_page_js', 0));
+  $form['buttons']['submit']['#submit'][] = 'features_tools_features_admin_form_submit';
+  if (variable_get('featrues_tools_disable_features_page_js', 0) == 0) {
     return;
   }
   drupal_add_css('table.features .admin-check, table.features .admin-default, table.features .admin-overridden, table.features .admin-rebuilding, table.features .admin-needs-review {
 									display: inline!important;}', array('type' => 'inline'));
   $groups = array();
+  
   foreach ($form['#features'] as $feature) {
     if (isset($feature->info['package'])) {
       $package_title = !empty($feature->info['package']) ? $feature->info['package'] : t('Other');
@@ -105,7 +108,20 @@ function features_tools_form_features_admin_form_alter(&$form, &$form_state) {
  * Implements hook_form_FORM_ID_alter().
  */
 function features_tools_form_features_export_form_alter(&$form, &$form_state) {
+  $path = $form['#feature']->name ? drupal_get_path('module', $form['#feature']->name) : 'sites/all/modules';
+  $writeable = file_prepare_directory($path);
+  if ($writeable === FALSE) {
+    drupal_set_message(t('The directory @path does not exists or not writable', array('@path' => $path)), 'error');
+  }
   //TODO: add backup options.
+  if (variable_get('featrues_tools_disable_features_page_js', 0)) {
+    foreach ($form['export']['sources'] as &$value) {
+      if (is_array($value) && isset($value['#ajax'])) {
+        unset($value['#ajax']);
+      }
+    }
+  }
+  
   $form['buttons']['create'] = array(
     '#type' => 'submit',
     '#value' => t('Auto create feature'),
@@ -197,7 +213,7 @@ function features_tools_form_features_export_form_safe_submit($form, &$form_stat
       $error = TRUE;
     }
     if ($error) {
-      drupal_set_message(t('One or more files cannot be writing to the file system this is probably a permission issue. @see http://drupal.org/project/features_tools for more info'));
+      drupal_set_message(t('One or more files could not be written to the file system. This is probably a permission issue. See !link for more information.', array('!link' => l(t('the Features Tools module page'), 'http://drupal.org/project/ftools'))), 'error');
       return;
     }
     else {
@@ -272,7 +288,7 @@ function features_tools_export_build_form_submit($form, &$form_state) {
       }
     }
     if ($error) {
-      drupal_set_message(t('One or more files cannot be writing to the file system this is probably a permission issue. @see http://drupal.org/project/features_tools for more info'));
+      drupal_set_message(t('One or more files could not be written to the file system. This is probably a permission issue. See !link for more information.', array('!link' => l(t('the Features Tools module page'), 'http://drupal.org/project/ftools'))), 'error');
     }
     else {
       drupal_set_message(t('The feature was successfully created.'));
@@ -354,4 +370,8 @@ function _features_tools_get_unlink_version($destination) {
     $i++;
   }
   return array('destination' => "{$destination}_$i/", 'delta' => $i);
+}
+
+function features_tools_features_admin_form_submit($form, &$form_state) {
+  variable_set('featrues_tools_disable_features_page_js', $form_state['values']['disable_ajax']);
 }
