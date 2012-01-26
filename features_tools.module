@@ -108,7 +108,12 @@ function features_tools_form_features_admin_form_alter(&$form, &$form_state) {
  * Implements hook_form_FORM_ID_alter().
  */
 function features_tools_form_features_export_form_alter(&$form, &$form_state) {
-  $path = $form['#feature']->name ? drupal_get_path('module', $form['#feature']->name) : 'sites/all/modules';
+  if (isset($form['#feature']) && is_object($form['#feature']) && isset($form['#feature']->name)) {
+    $path = drupal_get_path('module', $form['#feature']->name);
+  }
+  else {
+    $path = 'sites/all/modules';
+  }
   $writeable = file_prepare_directory($path);
   if ($writeable === FALSE) {
     drupal_set_message(t('The directory @path does not exists or not writable', array('@path' => $path)), 'error');
@@ -131,7 +136,7 @@ function features_tools_form_features_export_form_alter(&$form, &$form_state) {
   $form['features_tools_dest'] = array(
     '#title' => t('Custom module path.'),
     '#type' => 'textfield',
-    '#default_value' => $form['#feature']->name ? drupal_get_path('module', $form['#feature']->name) : 'sites/all/modules',
+    '#default_value' => $path
   );
   if ($form['#feature']) {
     $form['buttons']['safe_recreate'] = array(
