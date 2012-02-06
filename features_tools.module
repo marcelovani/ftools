@@ -154,12 +154,14 @@ function features_tools_form_features_export_form_alter(&$form, &$form_state) {
  */
 function features_tools_form_features_export_form_safe_submit($form, &$form_state) {
 
-  module_load_include('inc', 'features', 'features.export');
-  features_include();
-  module_load_include('inc', 'rules', 'modules/events');
-  rules_invoke_event('init');
-  module_load_include('inc', 'rules_admin', 'rules_admin.export');
-  module_load_include('inc', 'rules', 'rules.export');
+  if (module_exists('rules')) {
+    module_load_include('inc', 'features', 'features.export');
+    features_include();
+    module_load_include('inc', 'rules', 'modules/events');
+    rules_invoke_event('init');
+    module_load_include('inc', 'rules_admin', 'rules_admin.export');
+    module_load_include('inc', 'rules', 'rules.export');
+  }
 
   $destination = $form_state['values']['features_tools_dest'];
   $arr = explode('/', $destination);
