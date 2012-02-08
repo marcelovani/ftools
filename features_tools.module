@@ -12,7 +12,7 @@ function features_tools_js_alter(&$javascript) {
   if (isset($item['path']) && $item['path'] === 'admin/structure/features') {
     $js_path = drupal_get_path('module', 'features') . '/features.js';
     if (isset($javascript[$js_path])) {
-      if (variable_get('featrues_tools_disable_features_page_js', 1)) {
+      if (variable_get('featrues_tools_disable_features_page_js', 0)) {
         unset($javascript[$js_path]);
       }
     }
