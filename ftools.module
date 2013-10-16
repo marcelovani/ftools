@@ -277,6 +277,10 @@ function ftools_export_build_form_submit($form, &$form_state) {
   if (!empty($form_state['values']['project_status_url'])) {
     $export['project status url'] = $form_state['values']['project_status_url'];
   }
+  if (!empty($form_state['values']['package'])) {
+    $export['package'] = $form_state['values']['package'];
+  }
+
   // Generate download.
   $directory = '';
   $destination = $form_state['values']['ftools_dest'];
