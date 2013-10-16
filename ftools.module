@@ -262,9 +262,13 @@ function ftools_export_build_form_submit($form, &$form_state) {
   $export = features_populate($stub, $form_state['values']['sources']['dependencies'], $module_name);
 
   // Directly copy the following attributes.
-  $attr = array('name', 'description');
+  $attr = array('name', 'description', 'package' , 'scripts' , 'stylesheets');
   foreach ($attr as $key) {
     $export[$key] = isset($form_state['values'][$key]) ? $form_state['values'][$key] : NULL;
+    //allow scripts and stylesheets from the form, they are not in form_state
+    if (isset($form['#feature']->info[$key])) {
+      $export[$key] = $form['#feature']->info[$key];
+    }
   }
   // If either update status-related keys are provided, add a project key
   // corresponding to the module name.
