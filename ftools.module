@@ -364,6 +364,7 @@ function ftools_unlink_form_submit($form, &$form_state) {
           //i add a try catch block meanwhile to hide the error message.
           try {
             include_once DRUPAL_ROOT . "/" . $files[$key]->uri;
+            call_user_func_array($function_name, array());
           } catch (Exception $e) {
             watchdog('ftools', "error in unlink function:" . $e->getMessage());
           }
