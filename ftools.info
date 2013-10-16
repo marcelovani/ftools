@@ -1,5 +1,5 @@
 name = "ftools"
 description = "Provides feature management auto download button."
 core = 7.x
-dependencies[] = "features"
+dependencies[] = "features (1.x)"
 package = "Features"
