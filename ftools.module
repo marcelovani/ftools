@@ -287,6 +287,7 @@ function ftools_export_build_form_submit($form, &$form_state) {
  */
 function ftools_unlink_form($form, $form_state) {
   $files = drupal_system_listing('/\.unlink.inc$/', 'modules', 'name', 0);
+  
   $form = array();
   $options = array();
   foreach ($files as $value) {
@@ -309,35 +310,54 @@ function ftools_unlink_form($form, $form_state) {
  * @see http://drupal.org/node/1354
  */
 function ftools_unlink_form_submit($form, &$form_state) {
-
-  $hooks = _ftools_get_hooks();
-  $files = drupal_system_listing('/\.unlink.inc$/', 'modules', 'name', 0);
   foreach ($form_state['values']['unlink_options'] as $key => $value) {
     if ($value) {
-      include_once DRUPAL_ROOT . "/" . $files[$key]->uri;
-      views_include('view');
-
-      foreach ($hooks as $hook) {
-        $function_name = str_replace('.unlink', '', $key) . "_$hook";
-        $function_name = str_replace('.', '_', $function_name);
-        if (function_exists($function_name)) {
-
-          //TODO add info file so we can check if the element is in the db before trying to insert it.
-          //i add a try catch block meanwhile to hide the error message.
-          try {
-            include_once DRUPAL_ROOT . "/" . $files[$key]->uri;
-            call_user_func_array($function_name, array());
-          } catch (Exception $e) {
-            watchdog('ftools', "error in unlink function:" . $e->getMessage());
-          }
-          
-          drupal_set_message("$hook $function_name");
-        }
-      }
+      _ftools_exec_unlink($key);
     }
   }
 }
 
+/**
+* Return unlink files
+*/
+function _ftools_get_unlink_files() {
+  $files = drupal_system_listing('/\.unlink.inc$/', 'modules', 'name', 0);
+  
+  return $files;
+}
+
+/**
+* Execute the given unlink file
+*/
+function _ftools_exec_unlink($component) {
+  $hooks = _ftools_get_hooks();
+  $files = _ftools_get_unlink_files();
+  
+  include_once DRUPAL_ROOT . "/" . $files[$component]->uri;
+  views_include('view');
+
+  foreach ($hooks as $hook) {
+    $function_name = str_replace('.unlink', '', $component) . "_$hook";
+    $function_name = str_replace('.', '_', $function_name);
+    if (function_exists($function_name)) {
+
+      //@TODO: add info file so we can check if the element is in the db before trying to insert it.
+      //i add a try catch block meanwhile to hide the error message.
+      try {
+        include_once DRUPAL_ROOT . "/" . $files[$component]->uri;
+        call_user_func_array($function_name, array());
+      } catch (Exception $e) {
+        watchdog('ftools', "error in unlink function:" . $e->getMessage());
+      }
+      
+      drupal_set_message("$hook $function_name");
+    }
+  }
+}
+
+/**
+* Return all hooks that are available for unlink components
+*/
 function _ftools_get_hooks() {
   return array('box', 'views_view', 'page_manager_pages', 'panels_mini');
 }
